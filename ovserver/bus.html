@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    All Station:'北京,上海,深圳,广州,成都,武汉,安徽,重庆,西安,北海道';
+    <br/>
+    Current Station is: <div style="color:red" id="currentStation"></div> <br>
+    Next Station is: <div style="color:blue" id="nextStation"></div><br>
+    Person in Bus info: <div style="color:#174d8a" id="personInfo"></div><br>
+    Get Bus Off info: <div style="color:#174d8a" id="offInfo"></div><br>
+    Bus state: <div style="color:#174d8a" id="busState"></div><br>
+</body>
+
+</html>
+<script>
+    const MAP = {
+        RUN_TIMER: 5000,
+        STOP_TIMER: 2000,
+        STATE:{
+            STOP: "stop",
+            RUNNING: "running",
+        },
+        // ["北京", "上海", "深圳", "广州", "成都", "武汉", "安徽", "重庆", "西安", "北海道"]
+        STATIONS: [
+            {
+                name: "北京",
+                persons: [{
+                        name: "张三",
+                        end: "深圳"
+                    },
+                    {
+                        name: "李四",
+                        end: "武汉"
+                    },
+                    {
+                        name: "王五",
+                        end: "上海"
+                    }
+                ]
+            },
+            {
+                name: "上海",
+                persons: [{
+                    name: "二狗",
+                    end: "安徽"
+                }]
+            },
+            {
+                name: "深圳",
+                persons: [{
+                        name: "三狗",
+                        end: "北海道"
+                    },
+                    {
+                        name: "四狗",
+                        end: "北海道"
+                    }
+                ]
+            },
+            {
+                name: "广州",
+                persons: [{
+                        name: "熊大",
+                        end: "西安"
+                    },
+                    {
+                        name: "熊二",
+                        end: "重庆"
+                    }
+                ]
+            },
+            {
+                name: "成都",
+                persons: [{
+                    name: "燃燃",
+                    end: "武汉"
+                }, ]
+            },
+            {
+                name: "武汉",
+                persons: [{
+                    name: "婉婉",
+                    end: "重庆"
+                }, ]
+            },
+            {
+                name: "安徽",
+                persons: [{
+                        name: "石头",
+                        end: "西安"
+                    },
+                    {
+                        name: "炸弹",
+                        end: "北海道"
+                    },
+                ]
+            },
+            {
+                name: "重庆",
+                persons: [{
+                    name: "杠铃",
+                    end: "西安"
+                }]
+            },
+            {
+                name: "西安",
+                persons: [{
+                        name: "小红",
+                        end: "北海道"
+                    },
+                    {
+                        name: "小蓝",
+                        end: "北海道"
+                    },
+                    {
+                        name: "小紫",
+                        end: "北海道"
+                    }
+                ]
+            },
+            {
+                name:"北海道",
+                persons:[]
+            }
+        ]
+    }
+    const Util = {
+        getInfoByStationName(name) {
+            return MAP.STATIONS.filter(x => {
+                return x.name == name;
+            })[0];
+        },
+        getNextStationInfo(name) {
+            let item = this.getInfoByStationName(name);
+            if (item.name == MAP.STATIONS[MAP.STATIONS.length - 1].name) {
+                return null;
+            }
+            let index = -1;
+            MAP.STATIONS.forEach((x, idx) => {
+                if (item.name == x.name) {
+                    index = idx;
+                }
+            })
+            return MAP.STATIONS[index + 1];
+        },
+        idSeed:{
+            id: 100000,
+            newId: () => {
+                return Util.idSeed.id++;
+            }
+        },
+        log:{
+            setDomValue(id, text){
+                document.querySelector(`#${id}`).innerHTML = text;
+            },
+            getPersonInfoInStation(bus){
+                let html = "";
+                bus._observer._subjects.forEach(x=>{
+                    html += `
+                        name:${x._name}, currentStation:${x._currentStation}, endStation:${x._endStation}<br/>
+                    `;
+                })
+                return html;
+            },
+            appendOffInfo(id, text){
+                let div = document.createElement("div");
+                div.innerHTML = text;
+                document.querySelector(`#${id}`).append(div);
+            }
+        }
+    }
+
+    class Observer {
+        constructor() {
+            this._subjects = [];
+        }
+        register(subject) {
+            this._subjects.push(subject);
+        }
+        unRegister(subject) {
+            this._subjects = this._subjects.filter(x => {
+                return x._id != subject._id;
+            })
+        }
+        broadcast(station) {
+            this._subjects.forEach(x => {
+                x.updateAndCheckStation(station, this);
+            })
+        }
+    }
+
+    class Person {
+        constructor(name, beginStation, endStation) {
+            this._beginStation = beginStation;
+            this._endStation = endStation;
+            this._currentStation = "";
+            this._name = name;
+            this._id = Util.idSeed.newId();
+        }
+
+        updateCurrentStation(station){
+            this._currentStation = station;
+        }
+
+        updateAndCheckStation(station, observer) {
+            //更新每个人的当前到站信息
+            this.updateCurrentStation(station);
+            if (this._currentStation == this._endStation) {
+                //到站下车
+                this.leave();
+                //注销观察者
+                observer.unRegister(this);
+            }
+        }
+
+        leave() {
+            let info = `${this._name} has been arrived ${this._endStation}`;
+            Util.log.appendOffInfo("offInfo", info);
+        }
+    }
+
+    class Bus {
+        constructor() {
+            this._runTimer = MAP.RUN_TIMER;
+            this._stopTimer = MAP.STOP_TIMER;
+            this._state = MAP.STATE.STOP;
+            this._currentStation = MAP.STATIONS[0].name;
+            this._isFirstStation = true;
+            this._observer = new Observer();
+
+            this._runnerTimer = null;
+        }
+
+        //上车
+        joinPerson() {
+            //当前站点信息
+            let info = Util.getInfoByStationName(this._currentStation);
+            //上人 &
+            info.persons.forEach(x => {
+                let person = new Person(x.name, info.name, x.end);
+                person.updateCurrentStation(this._currentStation);
+                this._observer.register(person);
+            })
+        }
+
+        //广播站点
+        broadcastStation(){
+            this._observer.broadcast(this._currentStation);
+        }
+
+        //Bus到站, 执行上下人操作, 等待操作完毕重新发车
+        run() {
+            let nextStationInfo = Util.getNextStationInfo(this._currentStation);
+            clearTimeout(this._runnerTimer);
+            //从北京出发
+            if (this._isFirstStation) {
+                Util.log.setDomValue("currentStation", this._currentStation);
+                Util.log.setDomValue("nextStation", nextStationInfo.name);
+                this.joinPerson();
+                Util.log.setDomValue("personInfo", Util.log.getPersonInfoInStation(this));
+                this._isFirstStation = false;
+                Util.log.setDomValue("busState", `首发站等人, ${this._currentStation}, 等待时间${this._stopTimer}`);
+                //停车完毕, 重新发车
+                setTimeout(()=>{
+                    this.tick();
+                },this._stopTimer)
+            } else {
+                let nextStationInfo = Util.getNextStationInfo(this._currentStation);
+                if(!nextStationInfo){
+                    //终点站
+                    Util.log.setDomValue("currentStation", this._currentStation);
+                    Util.log.setDomValue("nextStation", `终点站${this._currentStation}已经抵达!`);
+                    //报站 & 人员下车
+                    this.broadcastStation();
+                    //播报Bus人员信息
+                    Util.log.setDomValue("personInfo", Util.log.getPersonInfoInStation(this));
+                    Util.log.setDomValue("busState", `终点站${this._currentStation}已经抵达!`);
+                }else{
+                    //车辆到达下一站
+                    //报站 & 人员下车
+                    this._currentStation = nextStationInfo.name;
+                    Util.log.setDomValue("currentStation", this._currentStation);
+                    this.broadcastStation();
+                    let _next = Util.getNextStationInfo(this._currentStation);
+                    _next && Util.log.setDomValue("nextStation", _next.name);
+                    //上人
+                    this.joinPerson();
+                    //播报Bus人员信息
+                    Util.log.setDomValue("personInfo", Util.log.getPersonInfoInStation(this));
+                    
+                    //停车完毕, 重新发车
+                    Util.log.setDomValue("busState", `到站等人, ${this._currentStation}, 等待时间${this._stopTimer}`);
+                    setTimeout(()=>{
+                        this.tick();
+                    },this._stopTimer)
+                }
+            }
+        }
+
+        tick(){
+            console.log("run tick");
+            if(!this._isFirstStation){
+                Util.log.setDomValue("busState", `正在行车, ${this._currentStation}`);
+                this._runnerTimer = window.setTimeout(()=>{
+                    this.run();
+                }, this._runTimer)
+            }else{
+                this.run();
+            }
+        }
+    }
+
+    let bus = new Bus();
+    bus.tick();
+</script>
