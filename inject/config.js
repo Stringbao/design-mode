@@ -18,6 +18,8 @@ const IOCConfig = {
         $rootInjector.register("ListItem", (...args)=>{
             return new ListItem(...args);
         })
+
+        $rootInjector.register("Constant", []);
     }
 }
 IOCConfig.init();

@@ -10,4 +10,5 @@ let arr = [
 
 
 let list = IOC.use("List", arr);
+let data = IOC.use("Constant");
 debugger

@@ -7,8 +7,11 @@ class Injector{
         this._iocMap.set(key, callback);
     }
     use(key, ...args){
-        let cb = this._iocMap.get(key);
-        return cb(...args);
+        let res = this._iocMap.get(key);
+        if(typeof res == "function"){
+            return res(...args);
+        }
+        return res;
     }
 }
 export default new Injector();
